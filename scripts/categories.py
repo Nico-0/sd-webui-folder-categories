@@ -4,6 +4,7 @@ import gradio as gr
 import modules.scripts as scripts
 from modules.shared import opts
 from modules.ui_components import DropdownMulti
+from PIL import Image
 
 
 def add_tab():
@@ -19,8 +20,55 @@ def add_tab():
                 False,
                 label=opts.nicocat_zztest_checkbox_label
             )
+        with gr.Row():
+            # First column with a inputs
+            with gr.Column():
+                input_image = gr.Image(type='pil')
+                incremental_seed = gr.Checkbox(value=True, label='Give incremental seed number in image parameters (todo)')
+                with gr.Row():
+                    image_width = gr.Number(value=1024, label="Detected image width", interactive=False, scale=1)
+                    slider1 = gr.Slider(64, 2048, value=512, step=32, info="Width for each crop", scale=2)
+                    slider3 = gr.Slider(1, 10, value=2, step=1, info="Columns", scale=2)
+                with gr.Row():
+                    image_height = gr.Number(value=1024, label="Detected image height", interactive=False, scale=1)
+                    slider2 = gr.Slider(64, 2048, value=512, step=32, info="Height for each crop", scale=2)
+                    slider4 = gr.Slider(1, 10, value=2, step=1, info="Rows", scale=2)
+                button = gr.Button("Crop grid", variant='primary')
+                message_box = gr.Textbox(placeholder="Message will appear here...", label="temp textbox", readonly=True)
+            # Second column with a gallery
+            with gr.Column():
+                gallery = gr.Gallery(value=[], label="Gallery", show_label=False)
+
+        # check for input image size
+        # todo make it update sliders
+        def update_image_size(image):
+            input_width, input_height = image.size
+            return input_width, input_height
+        input_image.change(update_image_size, input_image, outputs=[image_width, image_height])
+        # update neighbor sliders
+        # todo check for newvalue == int(newvalue)
+        slider1.input(lambda width, input_width: input_width / width, inputs=[slider1, image_width], outputs=slider3)
+        slider3.input(lambda columns, input_width: input_width / columns, inputs=[slider3, image_width], outputs=slider1)
+        slider2.input(lambda height, input_height: input_height / height, inputs=[slider2, image_height], outputs=slider4)
+        slider4.input(lambda rows, input_height: input_height / rows, inputs=[slider4, image_height], outputs=slider2)
+        
+        def crop_grid(grid, width, height, columns, rows):
+            cropped_images = []
+            # Iterate cropping depending on image size and quantity
+            for i in range(rows):
+                y1 = i * height
+                y2 = (i + 1) * height
+                for j in range(columns):
+                    x1 = j * width
+                    x2 = (j + 1) * width
+                    # Crop the image and append to the list
+                    cropped_image = grid.crop((x1, y1, x2, y2))
+                    cropped_images.append(cropped_image)
+            return cropped_images
+        button.click(crop_grid, inputs=[input_image, slider1, slider2, slider3, slider4], outputs=[gallery])
 
     return [(ui, "Nico Folder Categories", "nicocat-tab")]
+
 
 
 def changed_folder():
